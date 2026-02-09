@@ -1,0 +1,28 @@
+{
+  "name": "iglesia-jerusalem-manual",
+  "version": "1.0.0",
+  "description": "IJC Production Manual - VitePress documentation site",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "preview": "vitepress preview docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbctechsolutions/iglesia-jerusalem-manual.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/jbctechsolutions/iglesia-jerusalem-manual/issues"
+  },
+  "homepage": "https://github.com/jbctechsolutions/iglesia-jerusalem-manual#readme",
+  "devDependencies": {
+    "@types/node": "25.2.2",
+    "typescript": "5.9.3",
+    "vitepress": "1.6.4",
+    "vue": "3.5.27"
+  }
+}
