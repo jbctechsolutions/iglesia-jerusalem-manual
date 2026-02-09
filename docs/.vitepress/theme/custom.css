@@ -1,0 +1,25 @@
+/**
+ * Custom styles for IJC Production Manual
+ * Extends VitePress default theme
+ */
+
+:root {
+  /* Custom color overrides can go here if needed */
+}
+
+/* Ensure good spacing for custom components */
+.vp-doc .status-monitor {
+  margin: 2rem 0;
+}
+
+/* Improve readability of device cards */
+.vp-doc .device-card {
+  transition: all 0.2s ease;
+}
+
+/* Mobile optimizations for status components */
+@media (max-width: 768px) {
+  .vp-doc .status-monitor {
+    margin: 1rem 0;
+  }
+}
