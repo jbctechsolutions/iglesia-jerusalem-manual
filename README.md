@@ -147,12 +147,17 @@ The manual is automatically deployed to production when changes are pushed to th
 **Deployment target:** `root@reverse-proxy:/var/www/remote-support/iglesia-jerusalem/manual/` (via Tailscale)
 
 **Required GitHub Secrets:**
-1. **OP_SERVICE_ACCOUNT_TOKEN** - 1Password service account token (loads deployment credentials)
-2. **INFRASTRUCTURE_DEPLOY_TOKEN** - GitHub PAT with `workflow` scope (triggers infrastructure deployment)
+- **OP_SERVICE_ACCOUNT_TOKEN** - 1Password service account token (loads all deployment credentials)
 
-Deployment credentials are stored in 1Password vault `qfvaof4bvqbdtpp3vvqoeaxxpi`:
-- Item: `iglesia-jerusalem-deploy`
-- Fields: `private key` (Ed25519 SSH key), `username` (root), `server` (reverse-proxy)
+**Credentials stored in 1Password** (vault `qfvaof4bvqbdtpp3vvqoeaxxpi`):
+
+1. **iglesia-jerusalem-deploy** - SSH deployment credentials
+   - `private key` (Ed25519 SSH key)
+   - `username` (root)
+   - `server` (reverse-proxy)
+
+2. **github-infrastructure-deploy** - GitHub PAT for triggering infrastructure workflows
+   - `credential` (GitHub Personal Access Token with `workflow` scope)
 
 See [docs/deployment.md](docs/deployment.md) for detailed deployment documentation.
 

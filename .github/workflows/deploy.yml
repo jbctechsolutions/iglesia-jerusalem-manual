@@ -10,14 +10,26 @@ jobs:
     name: Ensure Infrastructure Up-to-Date
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Infrastructure Deployment
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Load Infrastructure Deploy Token
         env:
-          GH_TOKEN: ${{ secrets.INFRASTRUCTURE_DEPLOY_TOKEN }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          echo "Loading GitHub PAT from 1Password..."
+
+          # Load GitHub Personal Access Token with workflow scope from 1Password
+          GITHUB_PAT=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/github-infrastructure-deploy/credential")
+
+          echo "GH_TOKEN=$GITHUB_PAT" >> $GITHUB_ENV
+          echo "::add-mask::$GITHUB_PAT"
+
+      - name: Trigger Infrastructure Deployment
         run: |
           echo "Ensuring reverse-proxy infrastructure is up-to-date..."
 
           # Trigger infrastructure deployment workflow
-          # Note: Requires INFRASTRUCTURE_DEPLOY_TOKEN secret (PAT with workflow scope)
           gh workflow run ansible-deploy.yml \
             --repo jbctechsolutions/infrastructure \
             --ref main \
