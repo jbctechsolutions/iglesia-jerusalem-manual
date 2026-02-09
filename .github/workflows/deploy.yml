@@ -6,8 +6,34 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  ensure-infrastructure:
+    name: Ensure Infrastructure Up-to-Date
     runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Infrastructure Deployment
+        env:
+          GH_TOKEN: ${{ secrets.INFRASTRUCTURE_DEPLOY_TOKEN }}
+        run: |
+          echo "Ensuring reverse-proxy infrastructure is up-to-date..."
+
+          # Trigger infrastructure deployment workflow
+          # Note: Requires INFRASTRUCTURE_DEPLOY_TOKEN secret (PAT with workflow scope)
+          gh workflow run ansible-deploy.yml \
+            --repo jbctechsolutions/infrastructure \
+            --ref main \
+            -f project=reverse-proxy \
+            -f environment=production \
+            -f operation=setup \
+            -f mode=apply
+
+          echo "✓ Infrastructure deployment triggered"
+          echo "Note: Deployment runs in parallel - manual deployment will proceed immediately"
+          echo "Infrastructure changes (Caddy config, rate limiting) will take effect within minutes"
+
+  build-and-deploy:
+    name: Build and Deploy Manual
+    runs-on: ubuntu-latest
+    needs: ensure-infrastructure
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,14 +67,13 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           # Load deployment credentials from 1Password
-          # Using `op read` directly for better reliability
           echo "Reading deployment secrets from 1Password..."
 
-          # Load SSH key, user, and host from 1Password vault
-          # Note: Update these item references to match your 1Password vault structure
+          # Load SSH key, user, host, and Tailscale auth key from 1Password
           SSH_PRIVATE_KEY=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/private key")
           DEPLOY_USER=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/username")
           DEPLOY_HOST=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/server")
+          TAILSCALE_AUTHKEY=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/kkjuywqcmxik3vnqytzzuxyh6q/credential")
 
           # Export to environment (masked in logs)
           echo "SSH_PRIVATE_KEY<<EOF" >> $GITHUB_ENV
@@ -62,7 +87,15 @@ jobs:
           echo "DEPLOY_HOST=$DEPLOY_HOST" >> $GITHUB_ENV
           echo "::add-mask::$DEPLOY_HOST"
 
+          echo "TAILSCALE_AUTHKEY=$TAILSCALE_AUTHKEY" >> $GITHUB_ENV
+          echo "::add-mask::$TAILSCALE_AUTHKEY"
+
           echo "Successfully loaded deployment secrets"
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ env.TAILSCALE_AUTHKEY }}
 
       - name: Deploy to server
         run: |
@@ -70,7 +103,24 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
+          # Wait for Tailscale DNS to resolve the deployment host
+          echo "Verifying Tailscale connectivity to ${DEPLOY_HOST}..."
+          for i in $(seq 1 10); do
+            if ssh -o ConnectTimeout=5 -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=no \
+              -i ~/.ssh/deploy_key \
+              ${DEPLOY_USER}@${DEPLOY_HOST} "echo 'SSH connection verified'"; then
+              break
+            fi
+            echo "Attempt $i/10 - waiting for Tailscale connectivity..."
+            sleep 3
+          done
+
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
             dist/ \
             ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/remote-support/iglesia-jerusalem/manual/
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
