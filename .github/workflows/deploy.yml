@@ -33,11 +33,38 @@ jobs:
           echo "Build verification passed - dist directory exists"
           ls -la dist/
 
-      - name: Deploy to server
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Load Deployment Secrets
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          # Load deployment credentials from 1Password
+          # Using `op read` directly for better reliability
+          echo "Reading deployment secrets from 1Password..."
+
+          # Load SSH key, user, and host from 1Password vault
+          # Note: Update these item references to match your 1Password vault structure
+          SSH_PRIVATE_KEY=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/private key")
+          DEPLOY_USER=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/username")
+          DEPLOY_HOST=$(op read "op://qfvaof4bvqbdtpp3vvqoeaxxpi/iglesia-jerusalem-deploy/server")
+
+          # Export to environment (masked in logs)
+          echo "SSH_PRIVATE_KEY<<EOF" >> $GITHUB_ENV
+          echo "$SSH_PRIVATE_KEY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "::add-mask::$SSH_PRIVATE_KEY"
+
+          echo "DEPLOY_USER=$DEPLOY_USER" >> $GITHUB_ENV
+          echo "::add-mask::$DEPLOY_USER"
+
+          echo "DEPLOY_HOST=$DEPLOY_HOST" >> $GITHUB_ENV
+          echo "::add-mask::$DEPLOY_HOST"
+
+          echo "Successfully loaded deployment secrets"
+
+      - name: Deploy to server
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
