@@ -118,33 +118,64 @@ Components automatically handle:
 
 ## Deployment
 
+### Unified Pipeline Architecture
+
+This repository uses **workflow orchestration** to ensure infrastructure and content stay in sync:
+
+```
+Push to main or workflow_dispatch
+        ↓
+Job 1: Ensure Infrastructure
+  - Triggers infrastructure deployment
+  - Updates Caddy config, security headers, rate limiting
+        ↓ (runs in parallel)
+Job 2: Build and Deploy Manual
+  - Build VitePress site
+  - Deploy to production server via Tailscale
+```
+
+**Why two repositories?**
+- **iglesia-jerusalem-manual** (this repo): Content and documentation
+- **infrastructure**: Server configuration (Caddy, Ansible, Terraform)
+
+The infrastructure repo manages multiple services. Workflow orchestration ensures both stay in sync while maintaining separation of concerns.
+
 ### Automatic Deployment
 
 The manual is automatically deployed to production when changes are pushed to the `main` branch.
 
-**Deployment target:** `admin@10.100.0.34:/var/www/remote-support/iglesia-jerusalem/manual/`
+**Deployment target:** `root@reverse-proxy:/var/www/remote-support/iglesia-jerusalem/manual/` (via Tailscale)
 
 **Required GitHub Secrets:**
-- `DEPLOY_SSH_KEY` - SSH private key for deployment
-- `DEPLOY_USER` - Deployment user (admin)
-- `DEPLOY_HOST` - Deployment host (10.100.0.34)
+1. **OP_SERVICE_ACCOUNT_TOKEN** - 1Password service account token (loads deployment credentials)
+2. **INFRASTRUCTURE_DEPLOY_TOKEN** - GitHub PAT with `workflow` scope (triggers infrastructure deployment)
+
+Deployment credentials are stored in 1Password vault `qfvaof4bvqbdtpp3vvqoeaxxpi`:
+- Item: `iglesia-jerusalem-deploy`
+- Fields: `private key` (Ed25519 SSH key), `username` (root), `server` (reverse-proxy)
 
 See [docs/deployment.md](docs/deployment.md) for detailed deployment documentation.
 
 ### Manual Deployment
 
-You can also deploy manually if needed:
+You can also trigger deployment manually via GitHub Actions:
 
+**In GitHub UI:**
+1. Go to Actions → Deploy Manual
+2. Click "Run workflow"
+3. Select branch (main)
+4. Click "Run workflow"
+
+**Via GitHub CLI:**
 ```bash
-# Build the site
-npm run build
-
-# Deploy via rsync
-rsync -avz --delete \
-  -e "ssh -i ~/.ssh/ijc-manual-deploy" \
-  dist/ \
-  admin@10.100.0.34:/var/www/remote-support/iglesia-jerusalem/manual/
+gh workflow run deploy.yml --repo jbctechsolutions/iglesia-jerusalem-manual
 ```
+
+The workflow will:
+1. Trigger infrastructure deployment (Caddy config, rate limiting)
+2. Build VitePress site
+3. Connect to reverse-proxy via Tailscale
+4. Deploy built site via rsync
 
 ### Deployment Verification
 
@@ -155,15 +186,23 @@ After deployment, use the [deployment checklist](docs/deployment-checklist.md) t
 - Cross-browser compatibility
 - API connectivity
 
-## Authentication
+## Authentication & Security
 
-The manual is protected by Caddy reverse proxy authentication:
+The manual is protected by Caddy reverse proxy with multiple security layers:
 
+**Authentication:**
 - **Tailscale users:** Automatically authenticated (no password required)
 - **External users:** Must enter password
 - **No VitePress authentication:** All auth is handled by Caddy
 
-This keeps the VitePress site simple and secure - it's just static files behind authenticated access.
+**Security Features:**
+- **Rate Limiting:** 10 requests/minute on login page (prevents brute-force attacks)
+- **HSTS:** Enforces HTTPS connections
+- **CSP:** Content Security Policy prevents XSS attacks
+- **X-Frame-Options:** Prevents clickjacking
+- **Security Headers:** X-Content-Type-Options, Permissions-Policy, Referrer-Policy
+
+This keeps the VitePress site simple and secure - it's just static files behind authenticated, hardened access.
 
 ## Contributing
 
