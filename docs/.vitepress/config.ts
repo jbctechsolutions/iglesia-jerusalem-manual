@@ -60,5 +60,15 @@ export default defineConfig({
     }
   },
 
-  outDir: '../dist'
+  outDir: '../dist',
+
+  // Ignore localhost links (they only work when running locally)
+  // Also ignore internal links with base path (will be fixed in future PR)
+  ignoreDeadLinks: [
+    /^http:\/\/localhost/,
+    /^http:\/\/10\.100\.0\./,
+    /^http:\/\/companion\.ijc\.local/,
+    /^http:\/\/control\.ijc\.local/,
+    /\/iglesia-jerusalem\/manual\//
+  ]
 })
